@@ -44,6 +44,7 @@ export default function Dashboard() {
     try {
       setError('');
       const data = await getEngines();
+      console.log('ENGINES FROM API:', data);
       setEngines(data);
       if (data.length > 0 && !selectedEngineId) {
         setSelectedEngineId(data[0].engine_id);

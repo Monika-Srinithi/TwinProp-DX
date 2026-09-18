@@ -1,7 +1,6 @@
 import axios from 'axios';
-
 // Base API URL defaulting to backend port 8000
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://twinprop-dx.onrender.com/api';
+const API_BASE_URL = 'https://twinprop-dx.onrender.com/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
