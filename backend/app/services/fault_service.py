@@ -362,7 +362,7 @@ def evaluate_telemetry_diagnosis(
         anomaly_score = round(min(0.20, 0.5 * max_dev + 0.5 * mean_dev), 2)
         health_index = round(max(85.0, 100.0 * (1.0 - anomaly_score)), 1)
 
-    active_count = sum(1 for d in deviations if d.status in ("WARNING", "CRITICAL"))
+    active_count = 0 if severity == "NORMAL" else sum(1 for d in deviations if d.status in ("WARNING", "CRITICAL"))
 
     return DiagnosisResult(
         engine_id=engine_id,
@@ -530,3 +530,4 @@ def generate_simulation_telemetry(
             "ambient_temperature": 15.0,
             "battery_voltage": 28.1,
         }
+
