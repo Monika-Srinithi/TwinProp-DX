@@ -81,7 +81,7 @@ export default function Dashboard() {
       else setDiagnosis(null);
 
       if (missionsRes.status === 'fulfilled' && missionsRes.value.length > 0) {
-        const assigned = missionsRes.value.find((m) => m.engine_id === selectedEngineId) || missionsRes.value[0];
+        const assigned = missionsRes.value.find((m) => m.engine_id === selectedEngineId) || null;
         setActiveMission(assigned);
       }
     } catch (err) {
@@ -143,7 +143,7 @@ export default function Dashboard() {
     return 'normal';
   };
 
-  const healthScore = diagnosis?.health_score ?? (hasTelemetry ? 92.5 : 100);
+  const healthScore = diagnosis?.health_score ?? null;
   const healthSeverity = diagnosis?.severity ?? 'NORMAL';
 
   return (
@@ -297,7 +297,7 @@ export default function Dashboard() {
                       color: 'var(--text-main)',
                       lineHeight: 1
                     }}>
-                      {healthScore.toFixed(0)}%
+                      {healthScore != null ? `${healthScore.toFixed(0)}%` : 'N/A'}
                     </span>
                     <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)', textTransform: 'uppercase' }}>
                       HEALTH
@@ -423,7 +423,13 @@ export default function Dashboard() {
               title="Fuel Flow"
               value={latestTelemetry?.fuel_flow}
               unit="L/h"
-              status="normal"
+              status={
+                !hasTelemetry || latestTelemetry?.fuel_flow == null
+                  ? 'inactive'
+                  : latestTelemetry.fuel_flow < 18.0 || latestTelemetry.fuel_flow > 28.0
+                    ? 'warning'
+                    : 'normal'
+              }
               nominalRange="18.0 - 28.0 L/h"
               icon={Wind}
               hasData={hasTelemetry}
@@ -464,7 +470,7 @@ export default function Dashboard() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
                   <span style={{ color: 'var(--text-muted)' }}>Active Classification:</span>
                   <span className="font-mono" style={{ color: healthSeverity === 'NORMAL' ? 'var(--status-active)' : 'var(--accent-copper)', fontWeight: 600 }}>
-                    {diagnosis?.primary_fault ? diagnosis.primary_fault.replace(/_/g, ' ') : 'POWERTRAIN NOMINAL'}
+                    {diagnosis?.primary_fault ? diagnosis.primary_fault.replace(/_/g, ' ') : 'N/A'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
