@@ -143,7 +143,7 @@ export default function Dashboard() {
     return 'normal';
   };
 
-  const healthScore = diagnosis?.health_score ?? null;
+  const healthScore = diagnosis?.health_index ?? diagnosis?.health_score ?? null;
   const healthSeverity = diagnosis?.severity ?? 'NORMAL';
 
   return (
@@ -308,7 +308,7 @@ export default function Dashboard() {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
                     <h3 className="font-display" style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                      {selectedEngine?.engine_id || 'ENG-ROTAX-914-01'}
+                      {selectedEngine ? selectedEngine.engine_id : 'No Engine Selected'}
                     </h3>
                     <span className={`badge ${healthSeverity === 'CRITICAL' ? 'badge-critical' : healthSeverity === 'WARNING' ? 'badge-warning' : 'badge-operational'}`}>
                       {healthSeverity}
@@ -318,9 +318,9 @@ export default function Dashboard() {
                     Rotax 914 F Series • 84.5 kW (115 HP) Turbocharged Piston Engine
                   </p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', fontSize: '0.725rem', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-                    <span>Airframe: <strong>{selectedEngine?.aircraft_id || 'UAV-MALE-TAPAS-01'}</strong></span>
+                    <span>Airframe: <strong>{selectedEngine ? selectedEngine.aircraft_id : 'Unassigned'}</strong></span>
                     <span>•</span>
-                    <span>Status: <strong style={{ color: 'var(--status-active)' }}>{selectedEngine?.status || 'OPERATIONAL'}</strong></span>
+                    <span>Status: <strong style={{ color: selectedEngine ? 'var(--status-active)' : 'var(--text-dim)' }}>{selectedEngine ? selectedEngine.status : 'STANDBY'}</strong></span>
                   </div>
                 </div>
               </div>

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.database import get_db
 from app.models.mission import Mission
+from app.models.engine import Engine
 from app.schemas.mission import MissionCreate, MissionResponse
 
 router = APIRouter(prefix="/missions", tags=["Missions"])

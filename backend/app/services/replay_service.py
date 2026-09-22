@@ -48,11 +48,14 @@ def _get_mission_telemetry_records(mission: Mission, db: Session) -> List[Teleme
     """Retrieve telemetry records for a mission in chronological order, respecting start/end window."""
     query = db.query(Telemetry).filter(Telemetry.engine_id == mission.engine_id)
     if mission.start_time and mission.end_time:
-        bounded = query.filter(
+        return query.filter(
             Telemetry.timestamp >= mission.start_time,
             Telemetry.timestamp <= mission.end_time
         ).order_by(Telemetry.timestamp.asc()).all()
-        return bounded if len(bounded) > 0 else query.order_by(Telemetry.timestamp.asc()).all()
+    elif mission.start_time:
+        return query.filter(
+            Telemetry.timestamp >= mission.start_time
+        ).order_by(Telemetry.timestamp.asc()).all()
     return query.order_by(Telemetry.timestamp.asc()).all()
 
 def get_replay_missions_list(db: Session) -> List[ReplayMissionListItem]:
@@ -66,18 +69,21 @@ def get_replay_missions_list(db: Session) -> List[ReplayMissionListItem]:
         
         f_query = db.query(FaultLog).filter(FaultLog.engine_id == m.engine_id)
         if m.start_time and m.end_time:
-            bounded_f = f_query.filter(
+            f_count = f_query.filter(
                 FaultLog.timestamp >= m.start_time,
                 FaultLog.timestamp <= m.end_time
             ).count()
-            f_count = bounded_f if bounded_f > 0 else f_query.count()
+        elif m.start_time:
+            f_count = f_query.filter(
+                FaultLog.timestamp >= m.start_time
+            ).count()
         elif records:
             f_count = f_query.filter(
                 FaultLog.timestamp >= records[0].timestamp,
                 FaultLog.timestamp <= records[-1].timestamp
             ).count()
         else:
-            f_count = f_query.count()
+            f_count = 0
 
         items.append(
             ReplayMissionListItem(
