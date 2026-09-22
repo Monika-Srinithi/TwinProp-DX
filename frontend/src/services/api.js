@@ -1,6 +1,6 @@
 import axios from 'axios';
-// Base API URL defaulting to backend port 8000
-const API_BASE_URL = 'https://twinprop-dx.onrender.com/api';
+// Base API URL defaulting to relative /api or environment variable
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -142,8 +142,9 @@ export const getMissionReplay = async (missionId) => {
 // System Health endpoint
 export const getSystemHealth = async () => {
   // Directly hit /health on host (without /api prefix)
+  const rootBase = API_BASE_URL.replace(/\/api\/?$/, '') || '';
   const rootClient = axios.create({
-    baseURL: API_BASE_URL.replace(/\/api\/?$/, ''),
+    baseURL: rootBase || undefined,
     timeout: 5000,
   });
   const res = await rootClient.get('/health');
@@ -151,8 +152,9 @@ export const getSystemHealth = async () => {
 };
 
 export const getRootInfo = async () => {
+  const rootBase = API_BASE_URL.replace(/\/api\/?$/, '') || '';
   const rootClient = axios.create({
-    baseURL: API_BASE_URL.replace(/\/api\/?$/, ''),
+    baseURL: rootBase || undefined,
     timeout: 5000,
   });
   const res = await rootClient.get('/');
