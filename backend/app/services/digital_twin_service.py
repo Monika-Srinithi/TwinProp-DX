@@ -84,6 +84,7 @@ def evaluate_digital_twin_model(
     # 1. Turbocharger & TCU (Turbo Control Unit) Dynamic Model
     # ---------------------------------------------------------
     if not is_operational or throttle <= 5.0:
+    # MAP is model-estimated from ISA ambient pressure when no boost is active.
         map_bar = round(p_amb, 2)
         wastegate_pct = 100.0  # Fully open / bypass
         pressure_ratio = 1.0
@@ -245,12 +246,12 @@ def evaluate_digital_twin_model(
     # ---------------------------------------------------------
     # Subsystem scores (0 - 100%)
     if not is_operational:
-        core_health = 100.0
-        turbo_health = 100.0
-        lub_health = 100.0
-        cool_health = 100.0
-        elec_health = 100.0
-        fidelity_score = 100.0
+        core_health = None
+        turbo_health = None
+        lub_health = None
+        cool_health = None
+        elec_health = None
+        fidelity_score = None
     else:
         # Core: based on RPM deficit, vibration, fuel flow alignment
         rpm_err = abs(telemetry.get("rpm", 0) - twin_baselines["rpm"]) / 200.0

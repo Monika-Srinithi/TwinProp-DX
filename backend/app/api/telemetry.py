@@ -47,7 +47,12 @@ def get_latest_telemetry(engine_id: str, db: Session = Depends(get_db)):
 def ingest_telemetry(data: TelemetryCreate, db: Session = Depends(get_db)):
     """Ingest a new real-time or simulated telemetry packet."""
     record_timestamp = data.timestamp or datetime.now(timezone.utc)
-
+    engine = db.query(Engine).filter(Engine.engine_id == data.engine_id).first()
+    if not engine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Engine '{data.engine_id}' not found in registry."
+        )
     telemetry_record = Telemetry(
         engine_id=data.engine_id,
         timestamp=record_timestamp,

@@ -502,7 +502,7 @@ export default function MissionReplay() {
         />
         <MetricCard
           title="Twin MAP / TCU"
-          value={twin ? `${twin.map_inhg.toFixed(1)} inHg` : '29.9 inHg'}
+          value={twin?.map_inhg != null ? `${twin.map_inhg.toFixed(1)} inHg` : 'N/A'}
           status={twin?.map_inhg > 39.9 ? 'critical' : 'normal'}
           nominalRange={twin ? `${twin.tcu_state.replace(/_/g, ' ')}` : 'Boost State'}
           icon={Wind}
@@ -636,7 +636,7 @@ export default function MissionReplay() {
               </h3>
             </div>
             <span className="badge font-mono badge-phase" style={{ fontSize: '0.7rem' }}>
-              {twin ? `${twin.twin_fidelity_score.toFixed(0)}% FIDELITY` : '100%'}
+              {twin?.twin_fidelity_score != null ? `${twin.twin_fidelity_score.toFixed(0)}% FIDELITY` : 'N/A'}
             </span>
           </div>
 
@@ -650,7 +650,9 @@ export default function MissionReplay() {
             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
               <span style={{ color: 'var(--text-muted)' }}>TCU Boost Target:</span>
               <span className="font-mono" style={{ color: 'var(--text-main)', fontWeight: 600 }}>
-                {twin ? `${twin.map_inhg.toFixed(1)} inHg (${twin.map_bar.toFixed(2)} bar)` : '29.9 inHg'}
+                {twin?.map_inhg != null && twin?.map_bar != null
+                  ? `${twin.map_inhg.toFixed(1)} inHg (${twin.map_bar.toFixed(2)} bar)`
+                  : 'N/A'}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>

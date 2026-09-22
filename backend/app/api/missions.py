@@ -26,12 +26,45 @@ def get_mission(mission_id: str, db: Session = Depends(get_db)):
 
 @router.post("", response_model=MissionResponse, status_code=status.HTTP_201_CREATED)
 def create_mission(mission_in: MissionCreate, db: Session = Depends(get_db)):
-    """Create a new mission profile."""
+    """Create a new mission profile with input validation."""
+
+    # Validate assigned engine exists
+    engine = db.query(Engine).filter(Engine.engine_id == mission_in.engine_id).first()
+    if not engine:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Engine '{mission_in.engine_id}' not found in registry."
+        )
+
+    # Validate mission ID uniqueness
     existing = db.query(Mission).filter(Mission.mission_id == mission_in.mission_id).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Mission '{mission_in.mission_id}' already exists."
+        )
+
+    # Validate mission time range
+    if mission_in.end_time is not None and mission_in.end_time < mission_in.start_time:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Mission end_time must be greater than or equal to start_time."
+        )
+
+    # Validate altitude against the project's telemetry operating range
+    if not -500.0 <= mission_in.altitude <= 20000.0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Mission altitude must be between -500 and 20000 meters."
+        )
+
+    # Validate controlled mission status
+    allowed_statuses = {"PLANNED", "IN_PROGRESS", "COMPLETED", "ABORTED"}
+    mission_status = mission_in.status.upper()
+    if mission_status not in allowed_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Mission status must be one of: {', '.join(sorted(allowed_statuses))}."
         )
 
     new_mission = Mission(
@@ -43,7 +76,7 @@ def create_mission(mission_in: MissionCreate, db: Session = Depends(get_db)):
         altitude=mission_in.altitude,
         payload=mission_in.payload,
         environment=mission_in.environment,
-        status=mission_in.status
+        status=mission_status,
     )
     db.add(new_mission)
     db.commit()

@@ -513,7 +513,7 @@ export default function DigitalTwin() {
               <Gauge size={16} color="var(--status-warning)" />
             </div>
             <div className="font-mono" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.2rem', transition: 'color 0.3s ease' }}>
-              {turbo ? `${fmt(turbo.map_inhg, 1)} inHg` : '29.9 inHg'}
+              {turbo?.map_inhg != null ? `${fmt(turbo.map_inhg, 1)} inHg` : 'N/A'}
             </div>
             <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
               {turbo ? `${fmt(turbo.pressure_ratio, 2)} Pressure Ratio` : '1.00 PR'}
@@ -530,7 +530,7 @@ export default function DigitalTwin() {
               {turbo?.tcu_state?.replace(/_/g, ' ') || 'IDLE'}
             </div>
             <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
-              {turbo ? `${fmt(turbo.map_bar, 2)} bar target` : '1.0 bar'}
+              {turbo ? `${fmt(turbo.map_bar, 2)} bar target` : 'N/A'}
             </span>
           </div>
 
@@ -541,7 +541,9 @@ export default function DigitalTwin() {
               <Sliders size={16} color="var(--accent-copper)" />
             </div>
             <div className="font-mono" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.4rem', transition: 'color 0.3s ease' }}>
-              {turbo ? `${fmt(turbo.wastegate_position_pct, 0)}%` : '100%'}
+              {turbo?.wastegate_position_pct != null
+                ? `${fmt(turbo.wastegate_position_pct, 0)}%`
+                : 'N/A'}
               <span style={{ fontSize: '0.75rem', fontWeight: 400, color: 'var(--text-muted)', marginLeft: '0.25rem' }}>Open</span>
             </div>
             <div style={{ width: '100%', height: '6px', backgroundColor: isDark ? 'var(--border-color)' : '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
@@ -808,7 +810,7 @@ export default function DigitalTwin() {
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginBottom: '0.5rem' }}>
                 <span className="font-mono" style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', transition: 'color 0.3s ease' }}>
-                  {subs ? `${fmt(subs.core_health, 0)}%` : '100%'}
+                  {subs ? `${fmt(subs.core_health, 0)}%` : 'N/A'}
                 </span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>HEALTH</span>
               </div>
@@ -852,7 +854,7 @@ export default function DigitalTwin() {
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginBottom: '0.5rem' }}>
                 <span className="font-mono" style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', transition: 'color 0.3s ease' }}>
-                  {subs ? `${fmt(subs.turbo_health, 0)}%` : '100%'}
+                  {subs ? `${fmt(subs.turbo_health, 0)}%` : 'N/A'}
                 </span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>HEALTH</span>
               </div>
@@ -896,7 +898,7 @@ export default function DigitalTwin() {
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginBottom: '0.5rem' }}>
                 <span className="font-mono" style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', transition: 'color 0.3s ease' }}>
-                  {subs ? `${fmt(subs.lubrication_health, 0)}%` : '100%'}
+                  {subs ? `${fmt(subs.lubrication_health, 0)}%` : 'N/A'}
                 </span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>HEALTH</span>
               </div>
@@ -940,7 +942,7 @@ export default function DigitalTwin() {
 
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.4rem', marginBottom: '0.5rem' }}>
                 <span className="font-mono" style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', transition: 'color 0.3s ease' }}>
-                  {subs ? `${fmt(subs.cooling_health, 0)}%` : '100%'}
+                  {subs ? `${fmt(subs.cooling_health, 0)}%` : 'N/A'}
                 </span>
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>HEALTH</span>
               </div>

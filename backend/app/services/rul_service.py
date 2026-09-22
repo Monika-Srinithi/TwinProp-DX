@@ -30,7 +30,7 @@ from app.services.digital_twin_service import evaluate_digital_twin_model
 TBO_REFERENCE_HOURS = 2000.0          # OEM Reference Time Between Overhaul
 INSPECTION_MINOR_HOURS = 100.0        # Minor line inspection interval
 INSPECTION_INTERMEDIATE_HOURS = 500.0  # Intermediate borescope / valve interval
-ASSUMED_INITIAL_HOURS = 142.5         # Initial baseline logged airframe hours
+ASSUMED_INITIAL_HOURS = 142.5         # Assumed prototype baseline; replace with verified accumulated engine hours when available
 
 def calculate_stress_multipliers(
     telemetry: Dict[str, Any],
@@ -134,7 +134,12 @@ def estimate_remaining_useful_life(
     twin = evaluate_digital_twin_model(engine_id, latest_telemetry, eval_time)
 
     # 2. Check active faults from fault logs
-    unacknowledged = [f for f in recent_faults if not getattr(f, "is_acknowledged", False)]
+    active_fault_window = timedelta(seconds=20)
+    unacknowledged = [
+        f for f in recent_faults
+        if not getattr(f, "is_acknowledged", False)
+        and getattr(f, "timestamp", eval_time) >= eval_time - active_fault_window
+    ]
     has_critical = any(getattr(f, "severity", "") == "CRITICAL" for f in unacknowledged)
     active_count = len(unacknowledged)
 
