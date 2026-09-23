@@ -45,12 +45,14 @@ export default function Dashboard() {
       setError('');
       const data = await getEngines();
       console.log('ENGINES FROM API:', data);
-      setEngines(data);
-      if (data.length > 0 && !selectedEngineId) {
-        setSelectedEngineId(data[0].engine_id);
+      const engineList = Array.isArray(data) ? data : [];
+      setEngines(engineList);
+      if (engineList.length > 0 && !selectedEngineId) {
+        setSelectedEngineId(engineList[0].engine_id);
       }
     } catch (err) {
       setError('Could not connect to TwinProp backend to fetch engine list.');
+      setEngines([]);
     } finally {
       setLoading(false);
     }
@@ -74,15 +76,17 @@ export default function Dashboard() {
       if (latestRes.status === 'fulfilled') setLatestTelemetry(latestRes.value);
       else setLatestTelemetry(null);
 
-      if (historyRes.status === 'fulfilled') setTelemetryHistory(historyRes.value);
+      if (historyRes.status === 'fulfilled' && Array.isArray(historyRes.value)) setTelemetryHistory(historyRes.value);
       else setTelemetryHistory([]);
 
       if (diagRes.status === 'fulfilled') setDiagnosis(diagRes.value);
       else setDiagnosis(null);
 
-      if (missionsRes.status === 'fulfilled' && missionsRes.value.length > 0) {
+      if (missionsRes.status === 'fulfilled' && Array.isArray(missionsRes.value) && missionsRes.value.length > 0) {
         const assigned = missionsRes.value.find((m) => m.engine_id === selectedEngineId) || null;
         setActiveMission(assigned);
+      } else {
+        setActiveMission(null);
       }
     } catch (err) {
       // Quiet catch
@@ -95,7 +99,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [selectedEngineId]);
 
-  const selectedEngine = engines.find((e) => e.engine_id === selectedEngineId);
+  const selectedEngine = Array.isArray(engines) ? engines.find((e) => e.engine_id === selectedEngineId) : undefined;
   const hasTelemetry = latestTelemetry !== null;
 
   // Threshold evaluations
@@ -179,9 +183,9 @@ export default function Dashboard() {
               style={{ width: 'auto', minWidth: '200px' }}
               value={selectedEngineId}
               onChange={(e) => setSelectedEngineId(e.target.value)}
-              disabled={engines.length === 0}
+              disabled={!Array.isArray(engines) || engines.length === 0}
             >
-              {engines.length === 0 ? (
+              {!Array.isArray(engines) || engines.length === 0 ? (
                 <option value="">No Engines Registered</option>
               ) : (
                 engines.map((eng) => (

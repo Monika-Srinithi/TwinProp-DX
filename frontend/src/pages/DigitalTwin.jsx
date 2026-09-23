@@ -67,12 +67,14 @@ export default function DigitalTwin() {
     try {
       setError('');
       const data = await getEngines();
-      setEngines(data || []);
-      if (data && data.length > 0 && !selectedEngineId) {
-        setSelectedEngineId(data[0].engine_id);
+      const engineList = Array.isArray(data) ? data : [];
+      setEngines(engineList);
+      if (engineList.length > 0 && !selectedEngineId) {
+        setSelectedEngineId(engineList[0].engine_id);
       }
     } catch (err) {
       setError('Could not connect to backend to retrieve engine fleet.');
+      setEngines([]);
     } finally {
       setLoading(false);
     }
@@ -95,9 +97,10 @@ export default function DigitalTwin() {
 
       if (histRes?.states && Array.isArray(histRes.states)) {
         const formatted = histRes.states.map((s, idx) => {
-          const rpmObs = s.residuals?.find((r) => r.channel === 'rpm')?.observed ?? 0;
-          const rpmExp = s.residuals?.find((r) => r.channel === 'rpm')?.twin_expected ?? 0;
-          const thrObs = s.residuals?.find((r) => r.channel === 'throttle')?.observed ?? 0;
+          const resList = Array.isArray(s.residuals) ? s.residuals : [];
+          const rpmObs = resList.find((r) => r.channel === 'rpm')?.observed ?? 0;
+          const rpmExp = resList.find((r) => r.channel === 'rpm')?.twin_expected ?? 0;
+          const thrObs = resList.find((r) => r.channel === 'throttle')?.observed ?? 0;
           const pwr = s.thermodynamics?.power_kw ?? 0;
           const trq = s.thermodynamics?.torque_nm ?? 0;
           const map = s.turbocharger?.map_inhg ?? 0;

@@ -26,10 +26,11 @@ const toLocalDatetimeString = (date = new Date()) => {
 };
 
 const getNextMissionId = (missionsList = []) => {
+  const safeList = Array.isArray(missionsList) ? missionsList : [];
   const currentYear = new Date().getFullYear();
   const prefix = `MSN-${currentYear}-`;
   let maxSeq = 0;
-  missionsList.forEach((m) => {
+  safeList.forEach((m) => {
     if (m && m.mission_id && typeof m.mission_id === 'string') {
       const match = m.mission_id.match(new RegExp(`^${prefix}(\\d+)$`));
       if (match) {
@@ -72,13 +73,17 @@ export default function Missions() {
         getMissions(),
         getEngines(),
       ]);
-      setMissions(missionData);
-      setEngines(engineData);
-      if (engineData.length > 0 && !missionForm.engine_id) {
-        setMissionForm((prev) => ({ ...prev, engine_id: engineData[0].engine_id }));
+      const validMissions = Array.isArray(missionData) ? missionData : [];
+      const validEngines = Array.isArray(engineData) ? engineData : [];
+      setMissions(validMissions);
+      setEngines(validEngines);
+      if (validEngines.length > 0 && !missionForm.engine_id) {
+        setMissionForm((prev) => ({ ...prev, engine_id: validEngines[0].engine_id }));
       }
     } catch (err) {
       setError(`Failed to load mission data: ${err.message}`);
+      setMissions([]);
+      setEngines([]);
     } finally {
       setLoading(false);
     }

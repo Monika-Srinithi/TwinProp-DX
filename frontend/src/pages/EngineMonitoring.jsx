@@ -66,12 +66,14 @@ export default function EngineMonitoring() {
   const fetchEngines = async () => {
     try {
       const data = await getEngines();
-      setEngines(data);
-      if (data.length > 0 && !selectedEngineId) {
-        setSelectedEngineId(data[0].engine_id);
+      const engineList = Array.isArray(data) ? data : [];
+      setEngines(engineList);
+      if (engineList.length > 0 && !selectedEngineId) {
+        setSelectedEngineId(engineList[0].engine_id);
       }
     } catch (err) {
       setError('Failed to retrieve engines from backend.');
+      setEngines([]);
     }
   };
 
