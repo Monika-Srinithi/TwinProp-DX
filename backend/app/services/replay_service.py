@@ -48,15 +48,21 @@ def _get_mission_telemetry_records(mission: Mission, db: Session) -> List[Teleme
     """Retrieve telemetry records for a mission in chronological order, respecting start/end window."""
     query = db.query(Telemetry).filter(Telemetry.engine_id == mission.engine_id)
     if mission.start_time and mission.end_time:
-        return query.filter(
+        records = query.filter(
             Telemetry.timestamp >= mission.start_time,
             Telemetry.timestamp <= mission.end_time
         ).order_by(Telemetry.timestamp.asc()).all()
     elif mission.start_time:
-        return query.filter(
+        records = query.filter(
             Telemetry.timestamp >= mission.start_time
         ).order_by(Telemetry.timestamp.asc()).all()
-    return query.order_by(Telemetry.timestamp.asc()).all()
+    else:
+        records = query.order_by(Telemetry.timestamp.asc()).all()
+
+    # Safely filter records with non-null timestamp and sort in chronological order
+    valid_records = [r for r in records if r.timestamp is not None]
+    valid_records.sort(key=lambda r: r.timestamp)
+    return valid_records
 
 def get_replay_missions_list(db: Session) -> List[ReplayMissionListItem]:
     """Retrieve all missions with their telemetry frame counts and fault markers for GCS selection."""
@@ -67,20 +73,27 @@ def get_replay_missions_list(db: Session) -> List[ReplayMissionListItem]:
         records = _get_mission_telemetry_records(m, db)
         t_count = len(records)
         
-        f_query = db.query(FaultLog).filter(FaultLog.engine_id == m.engine_id)
-        if m.start_time and m.end_time:
-            f_count = f_query.filter(
+        # Calculate fault count strictly within the mission's active window
+        if records:
+            first_ts = records[0].timestamp
+            last_ts = records[-1].timestamp
+            if m.start_time and m.end_time:
+                f_start, f_end = m.start_time, m.end_time
+            elif m.start_time:
+                f_start, f_end = min(m.start_time, first_ts), last_ts
+            else:
+                f_start, f_end = first_ts, last_ts
+
+            f_count = db.query(FaultLog).filter(
+                FaultLog.engine_id == m.engine_id,
+                FaultLog.timestamp >= f_start,
+                FaultLog.timestamp <= f_end
+            ).count()
+        elif m.start_time and m.end_time:
+            f_count = db.query(FaultLog).filter(
+                FaultLog.engine_id == m.engine_id,
                 FaultLog.timestamp >= m.start_time,
                 FaultLog.timestamp <= m.end_time
-            ).count()
-        elif m.start_time:
-            f_count = f_query.filter(
-                FaultLog.timestamp >= m.start_time
-            ).count()
-        elif records:
-            f_count = f_query.filter(
-                FaultLog.timestamp >= records[0].timestamp,
-                FaultLog.timestamp <= records[-1].timestamp
             ).count()
         else:
             f_count = 0
@@ -116,14 +129,6 @@ def get_mission_replay_package(mission_id: str, db: Session) -> MissionReplayPac
     # Retrieve telemetry records in chronological order using shared mission window logic
     records = _get_mission_telemetry_records(mission, db)
 
-    # Retrieve all fault logs for this engine
-    fault_logs = (
-        db.query(FaultLog)
-        .filter(FaultLog.engine_id == engine_id)
-        .order_by(FaultLog.timestamp.asc())
-        .all()
-    )
-
     if not records:
         # Return empty shell if no telemetry has been recorded yet
         now = datetime.now(timezone.utc)
@@ -153,7 +158,41 @@ def get_mission_replay_package(mission_id: str, db: Session) -> MissionReplayPac
             frames=[],
         )
 
-    t0 = records[0].timestamp
+    # Determine first and last telemetry timestamps safely from actual recorded span
+    first_telemetry_ts = records[0].timestamp
+    last_telemetry_ts = records[-1].timestamp
+
+    # Flight duration in seconds calculated strictly from actual telemetry span
+    flight_duration = max(0.0, (last_telemetry_ts - first_telemetry_ts).total_seconds())
+
+    # Establish strict mission fault boundary window:
+    # 1. If start_time and end_time exist on mission: [mission.start_time, mission.end_time]
+    # 2. If only start_time exists: [min(mission.start_time, first_telemetry_ts), last_telemetry_ts]
+    # 3. Otherwise: [first_telemetry_ts, last_telemetry_ts]
+    # Future faults occurring after the window end are strictly excluded.
+    if mission.start_time and mission.end_time:
+        window_start = mission.start_time
+        window_end = mission.end_time
+    elif mission.start_time:
+        window_start = min(mission.start_time, first_telemetry_ts)
+        window_end = last_telemetry_ts
+    else:
+        window_start = first_telemetry_ts
+        window_end = last_telemetry_ts
+
+    # Retrieve only authentic fault logs within the mission window for this engine
+    fault_logs = (
+        db.query(FaultLog)
+        .filter(
+            FaultLog.engine_id == engine_id,
+            FaultLog.timestamp >= window_start,
+            FaultLog.timestamp <= window_end
+        )
+        .order_by(FaultLog.timestamp.asc())
+        .all()
+    )
+
+    t0 = first_telemetry_ts
     frames: List[ReplayFrame] = []
     fault_markers: List[ReplayFaultMarker] = []
 

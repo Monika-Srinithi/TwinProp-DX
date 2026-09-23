@@ -1,12 +1,44 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from sqlalchemy.exc import IntegrityError
+from typing import List, Optional
+from datetime import datetime, timezone
+import re
 from app.database import get_db
 from app.models.mission import Mission
 from app.models.engine import Engine
 from app.schemas.mission import MissionCreate, MissionResponse
 
 router = APIRouter(prefix="/missions", tags=["Missions"])
+
+def generate_unique_mission_id(db: Session, prefix: str = "MSN") -> str:
+    """Generate a unique sequential mission ID in the format MSN-{YEAR}-{SEQ:03d}."""
+    current_year = datetime.now(timezone.utc).year
+    year_prefix = f"{prefix}-{current_year}-"
+
+    existing_ids = db.query(Mission.mission_id).filter(Mission.mission_id.like(f"{year_prefix}%")).all()
+
+    max_seq = 0
+    pattern = re.compile(rf"^{re.escape(prefix)}-{current_year}-(\d+)$")
+    for (m_id,) in existing_ids:
+        match = pattern.match(m_id)
+        if match:
+            try:
+                seq = int(match.group(1))
+                if seq > max_seq:
+                    max_seq = seq
+            except ValueError:
+                pass
+
+    next_seq = max_seq + 1
+    candidate_id = f"{year_prefix}{next_seq:03d}"
+
+    # Extra safety check against collisions with any existing mission
+    while db.query(Mission).filter(Mission.mission_id == candidate_id).first():
+        next_seq += 1
+        candidate_id = f"{year_prefix}{next_seq:03d}"
+
+    return candidate_id
 
 @router.get("", response_model=List[MissionResponse])
 def get_missions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -27,7 +59,7 @@ def get_mission(mission_id: str, db: Session = Depends(get_db)):
 
 @router.post("", response_model=MissionResponse, status_code=status.HTTP_201_CREATED)
 def create_mission(mission_in: MissionCreate, db: Session = Depends(get_db)):
-    """Create a new mission profile with input validation."""
+    """Create a new mission profile with input validation and backend uniqueness protection."""
 
     # Validate assigned engine exists
     engine = db.query(Engine).filter(Engine.engine_id == mission_in.engine_id).first()
@@ -37,13 +69,20 @@ def create_mission(mission_in: MissionCreate, db: Session = Depends(get_db)):
             detail=f"Engine '{mission_in.engine_id}' not found in registry."
         )
 
-    # Validate mission ID uniqueness
-    existing = db.query(Mission).filter(Mission.mission_id == mission_in.mission_id).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Mission '{mission_in.mission_id}' already exists."
-        )
+    # Validate and resolve mission_id
+    raw_id = (mission_in.mission_id or "").strip()
+    if raw_id:
+        mission_id = raw_id
+        # Authoritative backend uniqueness check
+        existing = db.query(Mission).filter(Mission.mission_id == mission_id).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Mission '{mission_id}' already exists."
+            )
+    else:
+        # Backend-controlled unique ID generation
+        mission_id = generate_unique_mission_id(db)
 
     # Validate mission time range
     if mission_in.end_time is not None and mission_in.end_time < mission_in.start_time:
@@ -69,7 +108,7 @@ def create_mission(mission_in: MissionCreate, db: Session = Depends(get_db)):
         )
 
     new_mission = Mission(
-        mission_id=mission_in.mission_id,
+        mission_id=mission_id,
         engine_id=mission_in.engine_id,
         mission_type=mission_in.mission_type,
         start_time=mission_in.start_time,
@@ -79,7 +118,25 @@ def create_mission(mission_in: MissionCreate, db: Session = Depends(get_db)):
         environment=mission_in.environment,
         status=mission_status,
     )
-    db.add(new_mission)
-    db.commit()
-    db.refresh(new_mission)
+    try:
+        db.add(new_mission)
+        db.commit()
+        db.refresh(new_mission)
+    except IntegrityError:
+        db.rollback()
+        # In case of concurrent creation collision on auto-generation, retry once
+        if not raw_id:
+            mission_id = generate_unique_mission_id(db)
+            new_mission.mission_id = mission_id
+            try:
+                db.add(new_mission)
+                db.commit()
+                db.refresh(new_mission)
+                return new_mission
+            except IntegrityError:
+                db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Mission '{mission_id}' already exists."
+        )
     return new_mission

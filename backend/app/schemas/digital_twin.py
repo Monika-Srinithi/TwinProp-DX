@@ -32,6 +32,10 @@ class DigitalTwinTurbocharger(BaseModel):
     wastegate_position_pct: float = Field(..., description="Estimated wastegate valve position (0% fully closed, 100% bypass)")
     pressure_ratio: float = Field(..., description="Compressor pressure ratio (MAP / P_amb)")
     tcu_state: str = Field(..., description="TCU turbocharger control state")
+    is_map_estimated: bool = Field(
+        True,
+        description="True if MAP is derived from physics model calculations; False if directly measured by a physical sensor"
+    )
 
 
 class DigitalTwinSubsystems(BaseModel):

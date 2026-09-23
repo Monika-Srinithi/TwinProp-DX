@@ -204,111 +204,170 @@ def classify_fault(
             "Prior to next sortie, conduct standard pre-flight run-up and magneto check sequence."
         )
 
+    detected_faults: List[Dict[str, Any]] = []
+
     # 1. Oil System Degradation / Bearing Thermal Runaway
     if oil_pressure < 2.0 or (oil_pressure < 2.5 and oil_temp > 108.0):
         is_crit = oil_pressure < 1.7 or oil_temp > 118.0
-        sev = "CRITICAL" if is_crit else "WARNING"
-        conf = 0.94 if is_crit else 0.88
-        return (
-            "OIL_SYSTEM_DEGRADATION",
-            "FLT-OIL-003",
-            sev,
-            conf,
-            f"Active lubrication degradation: Oil pressure collapsed to {oil_pressure:.2f} bar with oil temperature at {oil_temp:.1f}°C.",
-            "Oil pump relief valve failure, lubrication line fracture, or thermal oil breakdown causing hydrodynamic bearing friction runaway.",
-            "IMMEDIATE PILOT ACTION: Reduce throttle to minimum sustaining level to limit bearing load. Plan immediate divert or emergency forced landing."
-        )
+        detected_faults.append({
+            "name": "OIL_SYSTEM_DEGRADATION",
+            "code": "FLT-OIL-003",
+            "severity": "CRITICAL" if is_crit else "WARNING",
+            "confidence": 0.94 if is_crit else 0.88,
+            "description": f"Active lubrication degradation: Oil pressure collapsed to {oil_pressure:.2f} bar with oil temperature at {oil_temp:.1f}°C.",
+            "root_cause": "Oil pump relief valve failure, lubrication line fracture, or thermal oil breakdown causing hydrodynamic bearing friction runaway.",
+            "recommended_action": "IMMEDIATE PILOT ACTION: Reduce throttle to minimum sustaining level to limit bearing load. Plan immediate divert or emergency forced landing.",
+            "order": 1,
+        })
 
     # 2. Spark Plug Fouling / Ignition Misfire
     if vibration > 12.5 and (egt < 720.0 or abs(egt - baselines["egt"]) > 60.0) and throttle > 40.0:
         is_crit = vibration > 16.0
-        sev = "CRITICAL" if is_crit else "WARNING"
-        conf = 0.91 if is_crit else 0.85
-        return (
-            "IGNITION_MISFIRE",
-            "FLT-IGN-001",
-            sev,
-            conf,
-            f"Combustion irregularity detected: High vibration RMS ({vibration:.1f} mm/s) accompanied by EGT divergence ({egt:.1f}°C).",
-            "Lead or carbon fouling across cylinder spark plug electrodes, cracked ignition lead, or CDI magneto timing desynchronization.",
-            "Switch ignition channel selection if dual-CDI switchable. Reduce throttle to reduce torsional oscillation across prop shaft. Abort high-load maneuvers."
-        )
+        detected_faults.append({
+            "name": "IGNITION_MISFIRE",
+            "code": "FLT-IGN-001",
+            "severity": "CRITICAL" if is_crit else "WARNING",
+            "confidence": 0.91 if is_crit else 0.85,
+            "description": f"Combustion irregularity detected: High vibration RMS ({vibration:.1f} mm/s) accompanied by EGT divergence ({egt:.1f}°C).",
+            "root_cause": "Lead or carbon fouling across cylinder spark plug electrodes, cracked ignition lead, or CDI magneto timing desynchronization.",
+            "recommended_action": "Switch ignition channel selection if dual-CDI switchable. Reduce throttle to reduce torsional oscillation across prop shaft. Abort high-load maneuvers.",
+            "order": 2,
+        })
 
     # 3. Turbocharger Boost Leak / Wastegate Stiction
     if throttle > 70.0 and (baselines["rpm"] - rpm >= 400.0) and fuel_flow > 20.0:
-        return (
-            "TURBO_BOOST_LEAK",
-            "FLT-TRB-002",
-            "WARNING",
-            0.87,
-            f"Turbocharger power deficit: Commanded throttle is {throttle:.0f}% but engine speed lags at {rpm:.0f} RPM despite high fuel flow ({fuel_flow:.1f} L/h).",
-            "Intercooler hose clamp rupture, compressor charge leak, or wastegate flap stiction preventing nominal manifold boost pressure development.",
-            "Maintain level flight attitude. Do not initiate climb. Account for reduced climb gradient and transition to visual descent corridor."
-        )
+        detected_faults.append({
+            "name": "TURBO_BOOST_LEAK",
+            "code": "FLT-TRB-002",
+            "severity": "WARNING",
+            "confidence": 0.87,
+            "description": f"Turbocharger power deficit: Commanded throttle is {throttle:.0f}% but engine speed lags at {rpm:.0f} RPM despite high fuel flow ({fuel_flow:.1f} L/h).",
+            "root_cause": "Intercooler hose clamp rupture, compressor charge leak, or wastegate flap stiction preventing nominal manifold boost pressure development.",
+            "recommended_action": "Maintain level flight attitude. Do not initiate climb. Account for reduced climb gradient and transition to visual descent corridor.",
+            "order": 3,
+        })
 
     # 4. Cylinder Overheat / Heat Rejection Deficit
     if cht > 135.0:
         is_crit = cht > 142.0
-        sev = "CRITICAL" if is_crit else "WARNING"
-        conf = 0.92 if is_crit else 0.86
-        return (
-            "COOLING_DEGRADATION",
-            "FLT-COOL-004",
-            sev,
-            conf,
-            f"Cylinder head thermal barrier excursion: CHT reached {cht:.1f}°C (exceeds 135°C nominal threshold).",
-            "Cooling jacket air-ducting blockage, coolant pump cavitation, or extreme lean cylinder mixture thermal load.",
-            "Increase UAV forward airspeed to augment ram-air cooling. Lower flight climb rate. Retract cowl flaps if equipped."
-        )
+        detected_faults.append({
+            "name": "COOLING_DEGRADATION",
+            "code": "FLT-COOL-004",
+            "severity": "CRITICAL" if is_crit else "WARNING",
+            "confidence": 0.92 if is_crit else 0.86,
+            "description": f"Cylinder head thermal barrier excursion: CHT reached {cht:.1f}°C (exceeds 135°C nominal threshold).",
+            "root_cause": "Cooling jacket air-ducting blockage, coolant pump cavitation, or extreme lean cylinder mixture thermal load.",
+            "recommended_action": "Increase UAV forward airspeed to augment ram-air cooling. Lower flight climb rate. Retract cowl flaps if equipped.",
+            "order": 4,
+        })
 
     # 5. Fuel Starvation / Lean Burn Anomaly
     if throttle > 60.0 and fuel_flow < 14.0 and egt > 870.0:
-        return (
-            "FUEL_STARVATION",
-            "FLT-FUEL-005",
-            "CRITICAL",
-            0.93,
-            f"Critical lean burn anomaly: Fuel flow is restricted to {fuel_flow:.1f} L/h at {throttle:.0f}% throttle, driving EGT to {egt:.1f}°C.",
-            "In-line fuel filter restriction, vapor lock in high-altitude fuel rail, or mechanical fuel pump suction cavitation.",
-            "Activate auxiliary electric booster pump immediately. Transition to lower altitude to elevate fuel vapor pressure. Avoid throttle transients."
-        )
+        detected_faults.append({
+            "name": "FUEL_STARVATION",
+            "code": "FLT-FUEL-005",
+            "severity": "CRITICAL",
+            "confidence": 0.93,
+            "description": f"Critical lean burn anomaly: Fuel flow is restricted to {fuel_flow:.1f} L/h at {throttle:.0f}% throttle, driving EGT to {egt:.1f}°C.",
+            "root_cause": "In-line fuel filter restriction, vapor lock in high-altitude fuel rail, or mechanical fuel pump suction cavitation.",
+            "recommended_action": "Activate auxiliary electric booster pump immediately. Transition to lower altitude to elevate fuel vapor pressure. Avoid throttle transients.",
+            "order": 5,
+        })
 
     # 6. Electrical Bus Sag / Alternator Dropout
     if voltage < 25.0:
         is_crit = voltage < 22.5
-        sev = "CRITICAL" if is_crit else "WARNING"
-        conf = 0.95
-        return (
-            "ELECTRICAL_UNDERVOLTAGE",
-            "FLT-ELEC-006",
-            sev,
-            conf,
-            f"Tactical bus undervoltage: Bus voltage dropped to {voltage:.1f} V (nominal: 28.0 V).",
-            "Engine-driven alternator stator short, regulator-rectifier burnout, or excessive flight avionics load shedding failure.",
-            "Shed auxiliary optical payloads (EO/IR) and secondary RF relays immediately to conserve primary battery reserve for ECU and flight control servos."
-        )
+        detected_faults.append({
+            "name": "ELECTRICAL_UNDERVOLTAGE",
+            "code": "FLT-ELEC-006",
+            "severity": "CRITICAL" if is_crit else "WARNING",
+            "confidence": 0.95,
+            "description": f"Tactical bus undervoltage: Bus voltage dropped to {voltage:.1f} V (nominal: 28.0 V).",
+            "root_cause": "Engine-driven alternator stator short, regulator-rectifier burnout, or excessive flight avionics load shedding failure.",
+            "recommended_action": "Shed auxiliary optical payloads (EO/IR) and secondary RF relays immediately to conserve primary battery reserve for ECU and flight control servos.",
+            "order": 6,
+        })
 
     # 7. Isolated High Vibration Advisory
-    if vibration > 12.0:
-        return (
-            "MECHANICAL_VIBRATION",
-            "FLT-VIB-007",
-            "ADVISORY",
-            0.80,
-            f"Elevated airframe vibration: Measured RMS is {vibration:.1f} mm/s (nominal < 12.0 mm/s).",
-            "Propeller blade dynamic imbalance, loose engine rubber mount dampeners, or gearbox planetary backlash.",
-            "Avoid harmonic resonant RPM range. Inspect engine mount isolators during next post-flight turnaround."
-        )
+    if vibration > 12.0 and not any(f["name"] == "IGNITION_MISFIRE" for f in detected_faults):
+        detected_faults.append({
+            "name": "MECHANICAL_VIBRATION",
+            "code": "FLT-VIB-007",
+            "severity": "ADVISORY",
+            "confidence": 0.80,
+            "description": f"Elevated airframe vibration: Measured RMS is {vibration:.1f} mm/s (nominal < 12.0 mm/s).",
+            "root_cause": "Propeller blade dynamic imbalance, loose engine rubber mount dampeners, or gearbox planetary backlash.",
+            "recommended_action": "Avoid harmonic resonant RPM range. Inspect engine mount isolators during next post-flight turnaround.",
+            "order": 7,
+        })
 
     # 8. Nominal State
+    if not detected_faults:
+        return (
+            None,
+            None,
+            "NORMAL",
+            0.96,
+            "All monitored powerplant sensors are operating within nominal thermodynamic and operational baselines.",
+            "No mechanical, combustion, or lubrication anomalies detected.",
+            "Continue planned UAV mission profile. Maintain routine instrument scan."
+        )
+
+    # If exactly one fault triggered
+    if len(detected_faults) == 1:
+        f = detected_faults[0]
+        return (
+            f["name"],
+            f["code"],
+            f["severity"],
+            f["confidence"],
+            f["description"],
+            f["root_cause"],
+            f["recommended_action"]
+        )
+
+    # Multiple simultaneous faults detected:
+    # Deterministic priority ranking:
+    # 1. Severity weight: CRITICAL (3) > WARNING (2) > ADVISORY (1)
+    # 2. Confidence
+    # 3. Rule order
+    severity_weights = {"CRITICAL": 3, "WARNING": 2, "ADVISORY": 1}
+    sorted_faults = sorted(
+        detected_faults,
+        key=lambda x: (-severity_weights.get(x["severity"], 0), -x["confidence"], x["order"])
+    )
+
+    primary = sorted_faults[0]
+    concurrent = sorted_faults[1:]
+
+    concurrent_codes = ", ".join(f"{f['code']} ({f['name']})" for f in concurrent)
+
+    multi_description = (
+        f"{primary['description']} "
+        f"[CONCURRENT FAULTS: {len(detected_faults)} active failure modes detected. "
+        f"Primary: {primary['code']}. Also active: {concurrent_codes}.]"
+    )
+
+    multi_root_cause = (
+        f"{primary['root_cause']} "
+        f"Simultaneous failure conditions present: " +
+        "; ".join(f"[{f['code']} {f['name']}]: {f['root_cause']}" for f in concurrent)
+    )
+
+    multi_recommended_action = (
+        f"{primary['recommended_action']} "
+        f"CONCURRENT ADVISORIES: " +
+        "; ".join(f"[{f['code']}]: {f['recommended_action']}" for f in concurrent)
+    )
+
     return (
-        None,
-        None,
-        "NORMAL",
-        0.96,
-        "All monitored powerplant sensors are operating within nominal thermodynamic and operational baselines.",
-        "No mechanical, combustion, or lubrication anomalies detected.",
-        "Continue planned UAV mission profile. Maintain routine instrument scan."
+        primary["name"],
+        primary["code"],
+        primary["severity"],
+        primary["confidence"],
+        multi_description,
+        multi_root_cause,
+        multi_recommended_action
     )
 
 def evaluate_telemetry_diagnosis(
@@ -342,6 +401,27 @@ def evaluate_telemetry_diagnosis(
         recommended_action
     ) = classify_fault(telemetry, baselines, normalized_scores)
 
+    # Count WARNING/CRITICAL sensor deviations
+    excursion_deviations = [d for d in deviations if d.status in ("WARNING", "CRITICAL")]
+    excursion_count = len(excursion_deviations)
+
+    # If classified severity is NORMAL but sensor-level excursions exist, escalate to WARNING
+    if severity == "NORMAL" and excursion_count > 0:
+        severity = "WARNING"
+        excursion_labels = ", ".join(d.label for d in excursion_deviations)
+        description = (
+            f"Sensor-level parameter deviation detected across {excursion_count} channel(s) ({excursion_labels}), "
+            "exceeding nominal baseline thresholds without matching a confirmed specific fault signature."
+        )
+        root_cause = (
+            f"Individual sensor deviation detected ({excursion_labels}). "
+            "Multi-channel correlation does not confirm an active specific subsystem fault, but operating state warrants monitoring."
+        )
+        recommended_action = (
+            "Monitor trending telemetry across affected sensor channels. "
+            "Verify sensor calibration and observe for progressive thermal or mechanical divergence."
+        )
+
     # 5. Composite Anomaly Score (0.00 to 1.00)
     max_dev = max(normalized_scores.values()) if normalized_scores else 0.0
     mean_dev = sum(normalized_scores.values()) / len(normalized_scores) if normalized_scores else 0.0
@@ -362,7 +442,7 @@ def evaluate_telemetry_diagnosis(
         anomaly_score = round(min(0.20, 0.5 * max_dev + 0.5 * mean_dev), 2)
         health_index = round(max(85.0, 100.0 * (1.0 - anomaly_score)), 1)
 
-    active_count = 0 if severity == "NORMAL" else sum(1 for d in deviations if d.status in ("WARNING", "CRITICAL"))
+    active_count = 0 if severity == "NORMAL" else excursion_count
 
     return DiagnosisResult(
         engine_id=engine_id,

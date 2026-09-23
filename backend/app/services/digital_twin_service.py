@@ -83,13 +83,36 @@ def evaluate_digital_twin_model(
     # ---------------------------------------------------------
     # 1. Turbocharger & TCU (Turbo Control Unit) Dynamic Model
     # ---------------------------------------------------------
-    if not is_operational or throttle <= 5.0:
-    # MAP is model-estimated from ISA ambient pressure when no boost is active.
+    # Check if a real measured MAP value is present in the telemetry dictionary
+    measured_map_raw = (
+        telemetry.get("map")
+        if telemetry.get("map") is not None
+        else (telemetry.get("map_bar") if telemetry.get("map_bar") is not None else telemetry.get("manifold_pressure"))
+    )
+    measured_map: Optional[float] = None
+    if measured_map_raw is not None:
+        try:
+            val = float(measured_map_raw)
+            if val > 0.0:
+                measured_map = val
+        except (ValueError, TypeError):
+            measured_map = None
+
+    if measured_map is not None:
+        is_map_estimated = False
+        map_bar = round(measured_map, 2)
+        pressure_ratio = round(map_bar / p_amb, 2) if p_amb > 0.0 else 1.0
+        wastegate_pct = 100.0 if not is_operational else max(5.0, min(100.0, 100.0 - (throttle * 0.95)))
+        tcu_state = "MEASURED_TELEMETRY"
+    elif not is_operational or throttle <= 5.0:
+        # MAP is model-estimated from ISA ambient pressure when no boost is active.
+        is_map_estimated = True
         map_bar = round(p_amb, 2)
         wastegate_pct = 100.0  # Fully open / bypass
         pressure_ratio = 1.0
         tcu_state = "STANDSTILL" if rpm <= 0.0 else "IDLE_UNBOOSTED"
     else:
+        is_map_estimated = True
         # Rotax 914 F TCU boost regulation schedule:
         # - Part throttle (<65%): intake manifold is sub-atmospheric or equal to ambient
         # - Cruise (65-85%): wastegate closes to reach 1.00 - 1.15 bar (29.5 - 34.0 inHg)
@@ -300,6 +323,7 @@ def evaluate_digital_twin_model(
             wastegate_position_pct=round(wastegate_pct, 1),
             pressure_ratio=pressure_ratio,
             tcu_state=tcu_state,
+            is_map_estimated=is_map_estimated,
         ),
         subsystems=DigitalTwinSubsystems(
             core_health=core_health,

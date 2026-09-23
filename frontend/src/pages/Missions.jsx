@@ -25,6 +25,24 @@ const toLocalDatetimeString = (date = new Date()) => {
   return `${year}-${month}-${day}T${hours}:${mins}`;
 };
 
+const getNextMissionId = (missionsList = []) => {
+  const currentYear = new Date().getFullYear();
+  const prefix = `MSN-${currentYear}-`;
+  let maxSeq = 0;
+  missionsList.forEach((m) => {
+    if (m && m.mission_id && typeof m.mission_id === 'string') {
+      const match = m.mission_id.match(new RegExp(`^${prefix}(\\d+)$`));
+      if (match) {
+        const seq = parseInt(match[1], 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    }
+  });
+  return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`;
+};
+
 export default function Missions() {
   const [missions, setMissions] = useState([]);
   const [engines, setEngines] = useState([]);
@@ -35,7 +53,7 @@ export default function Missions() {
 
   // Form state
   const [missionForm, setMissionForm] = useState({
-    mission_id: 'MSN-2026-002',
+    mission_id: '',
     engine_id: '',
     mission_type: 'High-Altitude Surveillance',
     start_time: toLocalDatetimeString(new Date()),
@@ -70,6 +88,17 @@ export default function Missions() {
     loadData();
   }, []);
 
+  const openCreateModal = () => {
+    const nextId = getNextMissionId(missions);
+    setMissionForm((prev) => ({
+      ...prev,
+      mission_id: nextId,
+      start_time: toLocalDatetimeString(new Date()),
+      engine_id: prev.engine_id || (engines.length > 0 ? engines[0].engine_id : ''),
+    }));
+    setShowCreateModal(true);
+  };
+
   const handleCreateMission = async (e) => {
     e.preventDefault();
     try {
@@ -78,15 +107,20 @@ export default function Missions() {
         setError('Please assign an engine to the mission.');
         return;
       }
+      const rawMissionId = (missionForm.mission_id || '').trim();
       const payload = {
         ...missionForm,
+        ...(rawMissionId ? { mission_id: rawMissionId } : {}),
         altitude: Number(missionForm.altitude),
         start_time: new Date(missionForm.start_time).toISOString(),
         end_time: missionForm.end_time ? new Date(missionForm.end_time).toISOString() : null,
       };
+      if (!rawMissionId) {
+        delete payload.mission_id;
+      }
 
-      await createMission(payload);
-      setSuccessMsg(`Mission ${payload.mission_id} created successfully.`);
+      const created = await createMission(payload);
+      setSuccessMsg(`Mission ${created?.mission_id || payload.mission_id || 'new'} created successfully.`);
       setShowCreateModal(false);
       loadData();
       setTimeout(() => setSuccessMsg(''), 4000);
@@ -108,6 +142,31 @@ export default function Missions() {
         return 'badge-inactive';
     }
   };
+
+  // Calculate Fleet Readiness dynamically from registered engines
+  const validEngines = Array.isArray(engines)
+    ? engines.filter((e) => e && typeof e.status === 'string' && e.status.trim().length > 0)
+    : [];
+  const hasValidInputs = validEngines.length > 0;
+  const operationalCount = hasValidInputs
+    ? validEngines.filter((e) => e.status.trim().toUpperCase() === 'OPERATIONAL').length
+    : 0;
+  const readinessPct = hasValidInputs
+    ? Math.round((operationalCount / validEngines.length) * 100)
+    : null;
+
+  const readinessValue = hasValidInputs ? `${readinessPct}%` : 'N/A';
+  const readinessUnit = hasValidInputs ? 'Ready' : 'Unavailable';
+  const readinessStatus = !hasValidInputs
+    ? 'inactive'
+    : readinessPct >= 80
+      ? 'active'
+      : readinessPct >= 50
+        ? 'warning'
+        : 'critical';
+  const readinessRange = hasValidInputs
+    ? `${operationalCount} of ${validEngines.length} Ready for Sortie Dispatch`
+    : 'No fleet engines registered';
 
   return (
     <div className="page-container">
@@ -147,7 +206,7 @@ export default function Missions() {
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            onClick={() => setShowCreateModal(true)}
+            onClick={openCreateModal}
           >
             <PlusCircle size={14} />
             <span>Create Sortie</span>
@@ -210,10 +269,10 @@ export default function Missions() {
         />
         <MetricCard
           title="Active Engines"
-          value={engines.length}
+          value={operationalCount}
           unit="Powerplants"
-          status="normal"
-          nominalRange="TAPAS MALE UAV Fleet"
+          status={operationalCount > 0 ? "normal" : "warning"}
+          nominalRange={engines.length > 0 ? `${operationalCount} of ${engines.length} Operational` : 'No Engines Registered'}
           icon={Plane}
           hasData={true}
         />
@@ -228,11 +287,11 @@ export default function Missions() {
         />
         <MetricCard
           title="Fleet Readiness"
-          value="100%"
-          unit="Ready"
-          status="active"
-          nominalRange="Ready for Sortie Dispatch"
-          icon={ShieldCheck}
+          value={readinessValue}
+          unit={readinessUnit}
+          status={readinessStatus}
+          nominalRange={readinessRange}
+          icon={readinessStatus === 'critical' ? AlertCircle : ShieldCheck}
           hasData={true}
         />
       </div>
@@ -346,10 +405,13 @@ export default function Missions() {
                   <input
                     type="text"
                     className="form-input"
+                    placeholder="Auto-generated if blank (e.g. MSN-2026-002)"
                     value={missionForm.mission_id}
                     onChange={(e) => setMissionForm({ ...missionForm, mission_id: e.target.value })}
-                    required
                   />
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '0.25rem', display: 'block' }}>
+                    Leave blank to auto-generate unique sequential ID
+                  </span>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Assigned Powertrain</label>

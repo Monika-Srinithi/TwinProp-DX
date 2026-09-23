@@ -162,6 +162,7 @@ export default function DigitalTwin() {
 
   const thermo = twinState?.thermodynamics;
   const turbo = twinState?.turbocharger;
+  const isMapEstimated = turbo?.is_map_estimated ?? true;
   const subs = twinState?.subsystems;
   const residuals = Array.isArray(twinState?.residuals) ? twinState.residuals : [];
 
@@ -509,14 +510,16 @@ export default function DigitalTwin() {
           {/* MAP / Pressure Ratio */}
           <div className="card" style={{ padding: '1rem 1.15rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-              <span style={{ fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>MAP / Ratio</span>
+              <span style={{ fontSize: '0.725rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {isMapEstimated ? 'Estimated MAP / Ratio' : 'Measured MAP / Ratio'}
+              </span>
               <Gauge size={16} color="var(--status-warning)" />
             </div>
             <div className="font-mono" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.2rem', transition: 'color 0.3s ease' }}>
               {turbo?.map_inhg != null ? `${fmt(turbo.map_inhg, 1)} inHg` : 'N/A'}
             </div>
             <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
-              {turbo ? `${fmt(turbo.pressure_ratio, 2)} Pressure Ratio` : '1.00 PR'}
+              {turbo ? `${fmt(turbo.pressure_ratio, 2)} PR · ${isMapEstimated ? 'Model-estimated' : 'Measured'}` : '1.00 PR'}
             </span>
           </div>
 
@@ -530,7 +533,7 @@ export default function DigitalTwin() {
               {turbo?.tcu_state?.replace(/_/g, ' ') || 'IDLE'}
             </div>
             <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>
-              {turbo ? `${fmt(turbo.map_bar, 2)} bar target` : 'N/A'}
+              {turbo?.map_bar != null ? `${fmt(turbo.map_bar, 2)} bar ${isMapEstimated ? 'target (est.)' : 'target'}` : 'N/A'}
             </span>
           </div>
 
@@ -665,11 +668,11 @@ export default function DigitalTwin() {
                 <line x1="0" y1="8" x2="0" y2="40" stroke="var(--status-warning)" strokeWidth="1" strokeDasharray="2 2" />
               </g>
 
-              {/* Callout 2: Live MAP Pin (Pulsing) */}
+              {/* Callout 2: MAP Pin (Pulsing) */}
               <g className="animate-pin-pulse" transform="translate(45, 235)">
-                <rect x="-35" y="-12" width="80" height="20" rx="4" fill="var(--bg-card)" stroke="var(--accent-copper)" strokeWidth="1.5" />
+                <rect x="-48" y="-12" width="106" height="20" rx="4" fill="var(--bg-card)" stroke="var(--accent-copper)" strokeWidth="1.5" />
                 <text x="5" y="2" textAnchor="middle" fill="var(--accent-copper)" fontSize="9" fontFamily="var(--font-mono)" fontWeight="700">
-                  MAP {fmt(turbo?.map_inhg, 1)} inHg
+                  {isMapEstimated ? 'EST. MAP' : 'MAP'} {turbo?.map_inhg != null ? `${fmt(turbo.map_inhg, 1)} inHg` : 'N/A'}
                 </text>
                 <line x1="5" y1="-12" x2="55" y2="-65" stroke="var(--accent-copper)" strokeWidth="1" strokeDasharray="2 2" />
               </g>
@@ -734,11 +737,15 @@ export default function DigitalTwin() {
 
             {/* MAP Absolute */}
             <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '0.75rem 0.9rem', borderRadius: '8px', border: '1px solid var(--border-color)', transition: 'background-color 0.3s ease, border-color 0.3s ease' }}>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>Manifold Pressure</span>
-              <span className="font-mono" style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)', transition: 'color 0.3s ease' }}>
-                {turbo ? `${fmt(turbo.map_inhg, 1)} inHg` : 'N/A'}
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.2rem' }}>
+                {isMapEstimated ? 'Estimated MAP' : 'Measured MAP'}
               </span>
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'block' }}>({turbo ? `${fmt(turbo.map_bar, 2)} bar` : 'N/A'})</span>
+              <span className="font-mono" style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-main)', transition: 'color 0.3s ease' }}>
+                {turbo?.map_inhg != null ? `${fmt(turbo.map_inhg, 1)} inHg` : 'N/A'}
+              </span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'block' }}>
+                ({turbo?.map_bar != null ? `${fmt(turbo.map_bar, 2)} bar` : 'N/A'}{isMapEstimated ? ' · Model-estimated' : ' · Telemetry'})
+              </span>
             </div>
 
             {/* Boost Pressure Ratio */}
@@ -869,9 +876,13 @@ export default function DigitalTwin() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', fontSize: '0.75rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Target MAP / Ratio:</span>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  {isMapEstimated ? 'Estimated MAP / Ratio:' : 'Measured MAP / Ratio:'}
+                </span>
                 <span className="font-mono" style={{ color: 'var(--text-main)', fontWeight: 600 }}>
-                  {turbo ? `${fmt(turbo.map_inhg, 1)} inHg · ${fmt(turbo.pressure_ratio, 2)} PR` : 'Nominal'}
+                  {turbo?.map_inhg != null
+                    ? `${fmt(turbo.map_inhg, 1)} inHg · ${fmt(turbo.pressure_ratio, 2)} PR`
+                    : 'N/A'}
                 </span>
               </div>
             </div>
@@ -1141,7 +1152,7 @@ export default function DigitalTwin() {
                 <Legend wrapperStyle={{ fontSize: '0.78rem' }} />
                 <Line yAxisId="rpm" type="monotone" dataKey="rpmActual" name="Observed Actual RPM" stroke="var(--accent-copper)" strokeWidth={2.5} dot={{ r: 2 }} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out" />
                 <Line yAxisId="rpm" type="monotone" dataKey="rpmTwin" name="Twin Model Expected RPM" stroke="var(--status-active)" strokeWidth={2} strokeDasharray="4 4" dot={false} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out" />
-                <Line yAxisId="map" type="monotone" dataKey="mapInHg" name="Manifold Pressure (inHg)" stroke="var(--accent-teal)" strokeWidth={1.5} dot={false} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out" />
+                <Line yAxisId="map" type="monotone" dataKey="mapInHg" name={isMapEstimated ? "Model-Estimated MAP (inHg)" : "Measured MAP (inHg)"} stroke="var(--accent-teal)" strokeWidth={1.5} dot={false} isAnimationActive={true} animationDuration={1200} animationEasing="ease-out" />
               </LineChart>
             </ResponsiveContainer>
           ) : (

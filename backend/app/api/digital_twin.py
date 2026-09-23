@@ -27,7 +27,7 @@ router = APIRouter(prefix="/digital-twin", tags=["Digital Twin (Phase 2)"])
 
 def _telemetry_to_dict(record: Telemetry) -> dict:
     """Helper to convert SQLAlchemy Telemetry model to pure dictionary."""
-    return {
+    data = {
         "engine_id": record.engine_id,
         "rpm": record.rpm,
         "cht": record.cht,
@@ -41,6 +41,13 @@ def _telemetry_to_dict(record: Telemetry) -> dict:
         "altitude": record.altitude,
         "battery_voltage": record.battery_voltage,
     }
+    if hasattr(record, "map") and getattr(record, "map") is not None:
+        data["map"] = getattr(record, "map")
+    elif hasattr(record, "map_bar") and getattr(record, "map_bar") is not None:
+        data["map_bar"] = getattr(record, "map_bar")
+    elif hasattr(record, "manifold_pressure") and getattr(record, "manifold_pressure") is not None:
+        data["manifold_pressure"] = getattr(record, "manifold_pressure")
+    return data
 
 @router.get("/{engine_id}", response_model=DigitalTwinStateResponse)
 def get_digital_twin_state(engine_id: str, db: Session = Depends(get_db)):
@@ -86,6 +93,7 @@ def get_digital_twin_state(engine_id: str, db: Session = Depends(get_db)):
                 wastegate_position_pct=100.0,
                 pressure_ratio=1.0,
                 tcu_state="STANDSTILL",
+                is_map_estimated=True,
             ),
             subsystems=DigitalTwinSubsystems(
                 core_health=None,
