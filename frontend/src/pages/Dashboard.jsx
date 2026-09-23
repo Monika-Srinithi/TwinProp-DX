@@ -37,6 +37,7 @@ export default function Dashboard() {
   const [diagnosis, setDiagnosis] = useState(null);
   const [activeMission, setActiveMission] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
 
   // Fetch registered engines
@@ -47,12 +48,22 @@ export default function Dashboard() {
       console.log('ENGINES FROM API:', data);
       const engineList = Array.isArray(data) ? data : [];
       setEngines(engineList);
-      if (engineList.length > 0 && !selectedEngineId) {
-        setSelectedEngineId(engineList[0].engine_id);
+      let targetId = selectedEngineId;
+      if (engineList.length > 0) {
+        const stillExists = engineList.some((e) => e.engine_id === selectedEngineId);
+        if (!selectedEngineId || !stillExists) {
+          targetId = engineList[0].engine_id;
+          setSelectedEngineId(targetId);
+        }
+      } else {
+        targetId = '';
+        setSelectedEngineId('');
       }
+      return targetId;
     } catch (err) {
       setError('Could not connect to TwinProp backend to fetch engine list.');
       setEngines([]);
+      return '';
     } finally {
       setLoading(false);
     }
@@ -63,13 +74,14 @@ export default function Dashboard() {
   }, []);
 
   // Fetch telemetry, diagnosis, and mission for selected engine
-  const fetchEngineData = async () => {
-    if (!selectedEngineId) return;
+  const fetchEngineData = async (targetId) => {
+    const engineIdToFetch = targetId || selectedEngineId;
+    if (!engineIdToFetch) return;
     try {
       const [latestRes, historyRes, diagRes, missionsRes] = await Promise.allSettled([
-        getLatestTelemetry(selectedEngineId),
-        getTelemetry(selectedEngineId, 30),
-        getEngineDiagnosis(selectedEngineId),
+        getLatestTelemetry(engineIdToFetch),
+        getTelemetry(engineIdToFetch, 30),
+        getEngineDiagnosis(engineIdToFetch),
         getMissions(),
       ]);
 
@@ -83,13 +95,24 @@ export default function Dashboard() {
       else setDiagnosis(null);
 
       if (missionsRes.status === 'fulfilled' && Array.isArray(missionsRes.value) && missionsRes.value.length > 0) {
-        const assigned = missionsRes.value.find((m) => m.engine_id === selectedEngineId) || null;
+        const assigned = missionsRes.value.find((m) => m.engine_id === engineIdToFetch) || null;
         setActiveMission(assigned);
       } else {
         setActiveMission(null);
       }
     } catch (err) {
       // Quiet catch
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const activeId = await fetchEngines();
+      await fetchEngineData(activeId);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -198,14 +221,14 @@ export default function Dashboard() {
           </div>
 
           <button
+            type="button"
             className="btn btn-secondary btn-sm"
-            onClick={() => {
-              fetchEngines();
-              fetchEngineData();
-            }}
+            onClick={handleRefresh}
+            disabled={refreshing}
+            style={refreshing ? { opacity: 0.7, cursor: 'not-allowed' } : undefined}
             title="Refresh Telemetry"
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
             <span>Refresh</span>
           </button>
         </div>
