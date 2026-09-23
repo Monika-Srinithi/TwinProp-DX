@@ -119,9 +119,6 @@ function AppContent() {
           }}
         >
           TwinProp-DX • Real-Time Health Monitoring & Digital Twin Platform
-          <span style={{ marginLeft: '8px' }}>
-            • PHASE 1 FOUNDATION
-          </span>
         </footer>
 
       </div>
